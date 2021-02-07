@@ -16,16 +16,45 @@ package parallel
 
 import (
 	"errors"
+	"strings"
 	"sync"
 )
 
-type Task func(index int)
+type Task func(index int) error
+
+// Errors
+type Errors struct {
+	mutex sync.Mutex
+	Errs  []error
+}
+
+// Add add error
+func (errs *Errors) Add(err error) {
+	errs.mutex.Lock()
+	defer errs.mutex.Unlock()
+	errs.Errs = append(errs.Errs, err)
+}
+
+// Exists check error is exists
+func (errs *Errors) Exists() bool {
+	return len(errs.Errs) != 0
+}
+
+func (errs *Errors) Error() string {
+	arr := make([]string, len(errs.Errs))
+	for index, err := range errs.Errs {
+		arr[index] = err.Error()
+	}
+	return strings.Join(arr, ", ")
+}
 
 // Parallel limit task running for parallel call
 func Parallel(max, limit int, fn Task) error {
 	if limit <= 0 || max <= 0 {
 		return errors.New("max and limit should be gt 0")
 	}
+
+	errs := &Errors{}
 
 	// 设置带缓存的channel
 	ch := make(chan struct{}, limit)
@@ -39,12 +68,18 @@ func Parallel(max, limit int, fn Task) error {
 				wg.Done()
 				<-ch
 			}()
-			fn(index)
+			err := fn(index)
+			if err != nil {
+				errs.Add(err)
+			}
 		}()
 	}
 	// 等待所有任务完成
 	wg.Wait()
 	// 关闭channel
 	close(ch)
+	if errs.Exists() {
+		return errs
+	}
 	return nil
 }
