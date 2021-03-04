@@ -1,5 +1,7 @@
 # go-parallel
 
+[![Build Status](https://github.com/vicanso/go-parallel/workflows/Test/badge.svg)](https://github.com/vicanso/go-parallel/actions)
+
 parallel control for go
 
 ```go
