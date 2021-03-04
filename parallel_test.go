@@ -30,3 +30,13 @@ func TestParallel(t *testing.T) {
 	assert.Equal(len(arr), int(count))
 	assert.Equal(45, int(sum))
 }
+
+func TestErrors(t *testing.T) {
+	assert := assert.New(t)
+
+	errs := Errors{}
+	errs.Add(errors.New("abc"))
+
+	assert.True(errs.Exists())
+	assert.Equal("abc", errs.Error())
+}
