@@ -18,6 +18,7 @@ jobs:
         - '1.15'
         - '1.14'
         - '1.13'
+        - '1.12'
     steps:
 
     - name: Go ${{ matrix.go }} test 
