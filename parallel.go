@@ -18,8 +18,19 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
+type Option struct {
+	// the size of tasks
+	Max int
+	// the parallel limit
+	Limit int
+	// task function
+	Task Task
+	// break the function on error
+	BreakOnError bool
+}
 type Task func(index int) error
 
 // Errors
@@ -48,28 +59,40 @@ func (errs *Errors) Error() string {
 	return strings.Join(arr, ", ")
 }
 
-// Parallel limit task running for parallel call
-func Parallel(max, limit int, fn Task) error {
-	if limit <= 0 || max <= 0 {
+// EnhancedParallel runs the task function parallel
+func EnhancedParallel(opt Option) error {
+	if opt.Limit <= 0 || opt.Max <= 0 {
 		return errors.New("max and limit should be gt 0")
 	}
-
+	if opt.Task == nil {
+		return errors.New("task function can not be nil")
+	}
 	errs := &Errors{}
+	errCount := int32(0)
 
 	// 设置带缓存的channel
-	ch := make(chan struct{}, limit)
+	ch := make(chan struct{}, opt.Limit)
 	var wg sync.WaitGroup
-	for i := 0; i < max; i++ {
+	for i := 0; i < opt.Max; i++ {
 		index := i
 		wg.Add(1)
 		ch <- struct{}{}
 		go func() {
+			// 如果设置了出错时退出，而且当前出错数量不为1
+			if opt.BreakOnError && atomic.LoadInt32(&errCount) != 0 {
+				wg.Done()
+				<-ch
+				return
+			}
 			defer func() {
 				wg.Done()
 				<-ch
 			}()
-			err := fn(index)
+			err := opt.Task(index)
 			if err != nil {
+				if opt.BreakOnError {
+					atomic.AddInt32(&errCount, 1)
+				}
 				errs.Add(err)
 			}
 		}()
@@ -82,4 +105,13 @@ func Parallel(max, limit int, fn Task) error {
 		return errs
 	}
 	return nil
+}
+
+// Parallel runs task function parallel
+func Parallel(max, limit int, fn Task) error {
+	return EnhancedParallel(Option{
+		Max:   max,
+		Limit: limit,
+		Task:  fn,
+	})
 }
