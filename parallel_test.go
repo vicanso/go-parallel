@@ -80,6 +80,76 @@ func TestParallelBreakOnError(t *testing.T) {
 	assert.Equal(10, int(sum))
 }
 
+func TestRace(t *testing.T) {
+	assert := assert.New(t)
+
+	err := Race()
+	assert.Nil(err)
+	customErr := errors.New("custom error")
+
+	err = Race(func() error {
+		return customErr
+	})
+	assert.Equal(customErr, err)
+
+	err = Race(func() error {
+		return customErr
+	}, func() error {
+		time.Sleep(10 * time.Millisecond)
+		return nil
+	})
+	assert.Equal(customErr, err)
+
+	err = Race(func() error {
+		time.Sleep(50 * time.Millisecond)
+		return customErr
+	}, func() error {
+		time.Sleep(10 * time.Millisecond)
+		return nil
+	})
+	assert.Nil(err)
+}
+
+func TestSome(t *testing.T) {
+	assert := assert.New(t)
+
+	err := Some(5, 3, func(index int) error {
+		return errors.New("error")
+	})
+	assert.NotNil(err)
+	errs, ok := err.(*Errors)
+	assert.True(ok)
+	assert.Equal(5, len(errs.Errs))
+
+	err = Some(5, 3, func(index int) error {
+		if index%2 == 0 {
+			return nil
+		}
+		return errors.New("error")
+	})
+	assert.Nil(err)
+}
+
+func TestAny(t *testing.T) {
+	assert := assert.New(t)
+
+	err := Any(5, func(index int) error {
+		return errors.New("error")
+	})
+	assert.NotNil(err)
+	errs, ok := err.(*Errors)
+	assert.True(ok)
+	assert.Equal(5, len(errs.Errs))
+
+	err = Any(5, func(index int) error {
+		if index == 4 {
+			return nil
+		}
+		return errors.New("error")
+	})
+	assert.Nil(err)
+}
+
 func TestErrors(t *testing.T) {
 	assert := assert.New(t)
 
