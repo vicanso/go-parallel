@@ -43,6 +43,9 @@ type Errors struct {
 
 // Add add error
 func (errs *Errors) Add(err error) {
+	if err == nil {
+		return
+	}
 	errs.mutex.Lock()
 	defer errs.mutex.Unlock()
 	errs.Errs = append(errs.Errs, err)
@@ -72,25 +75,35 @@ func EnhancedParallel(opt Option) error {
 	errs := &Errors{}
 	errCount := int32(0)
 
-	// 设置带缓存的channel
+	// 设置带长度的channel，用于限制并发调用
 	ch := make(chan struct{}, opt.Limit)
 	var wg sync.WaitGroup
+
+	shouldBeBreak := func() bool {
+		return opt.BreakOnError && atomic.LoadInt32(&errCount) != 0
+	}
+
 	for i := 0; i < opt.Max; i++ {
+		// 如果设置出错时退出，而且出错数量不为0
+		// 直接退出当前循环
+		if shouldBeBreak() {
+			break
+		}
 		wg.Add(1)
+		// 此处会限制最多只创建limit数量的goroutine
 		ch <- struct{}{}
 		go func(index int) {
-			// 如果设置了出错时退出，而且当前出错数量不为1
-			// 此处仅简单的使用atomic处理，并不保证当一个任务出错后，
-			// 后续的任务肯定不执行。
-			if opt.BreakOnError && atomic.LoadInt32(&errCount) != 0 {
-				wg.Done()
-				<-ch
-				return
-			}
 			defer func() {
 				wg.Done()
 				<-ch
 			}()
+			// 如果设置了出错时退出，而且当前出错数量不为1
+			// 此处仅简单的使用atomic处理，并不保证当一个任务出错后，
+			// 后续的任务肯定不执行。
+			if shouldBeBreak() {
+				return
+			}
+
 			err := opt.Task(index)
 			if err != nil {
 				if opt.BreakOnError {
@@ -111,10 +124,14 @@ func EnhancedParallel(opt Option) error {
 }
 
 // Parallel runs task function parallel
-func Parallel(max, limit int, fn Task) error {
+func Parallel(fn Task, max int, limit ...int) error {
+	l := 2
+	if len(limit) != 0 {
+		l = limit[0]
+	}
 	return EnhancedParallel(Option{
 		Max:   max,
-		Limit: limit,
+		Limit: l,
 		Task:  fn,
 	})
 }
@@ -157,7 +174,7 @@ func Race(tasks ...RaceTask) error {
 
 // Some returns task function, when success time is >= count,
 // it returns nil, otherwise returns error.
-func Some(max, count int, fn Task) error {
+func Some(fn Task, max, count int) error {
 	if max <= 0 || count <= 0 {
 		return errors.New("max and count should be gt 0")
 	}
@@ -200,6 +217,6 @@ func Some(max, count int, fn Task) error {
 
 // Any runs task function, if one task is success, it will return nil,
 // otherwise returns error.
-func Any(max int, fn Task) error {
-	return Some(max, 1, fn)
+func Any(fn Task, max int) error {
+	return Some(fn, max, 1)
 }

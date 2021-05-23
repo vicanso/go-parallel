@@ -23,7 +23,7 @@ func TestParallel(t *testing.T) {
 		return nil
 	}
 
-	err := Parallel(len(arr), 3, fn)
+	err := Parallel(fn, len(arr))
 	assert.Nil(err)
 	assert.Equal(len(arr), int(count))
 	assert.Equal(45, int(sum))
@@ -41,7 +41,7 @@ func TestParallelError(t *testing.T) {
 		return errors.New(strconv.Itoa(index))
 	}
 
-	err := Parallel(len(arr), 3, fn)
+	err := Parallel(fn, len(arr), 3)
 	assert.NotNil(err)
 	errs, ok := err.(*Errors)
 	assert.True(ok)
@@ -113,40 +113,40 @@ func TestRace(t *testing.T) {
 func TestSome(t *testing.T) {
 	assert := assert.New(t)
 
-	err := Some(5, 3, func(index int) error {
+	err := Some(func(index int) error {
 		return errors.New("error")
-	})
+	}, 5, 3)
 	assert.NotNil(err)
 	errs, ok := err.(*Errors)
 	assert.True(ok)
 	assert.Equal(5, len(errs.Errs))
 
-	err = Some(5, 3, func(index int) error {
+	err = Some(func(index int) error {
 		if index%2 == 0 {
 			return nil
 		}
 		return errors.New("error")
-	})
+	}, 5, 3)
 	assert.Nil(err)
 }
 
 func TestAny(t *testing.T) {
 	assert := assert.New(t)
 
-	err := Any(5, func(index int) error {
+	err := Any(func(index int) error {
 		return errors.New("error")
-	})
+	}, 5)
 	assert.NotNil(err)
 	errs, ok := err.(*Errors)
 	assert.True(ok)
 	assert.Equal(5, len(errs.Errs))
 
-	err = Any(5, func(index int) error {
+	err = Any(func(index int) error {
 		if index == 4 {
 			return nil
 		}
 		return errors.New("error")
-	})
+	}, 5)
 	assert.Nil(err)
 }
 

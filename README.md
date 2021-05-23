@@ -18,7 +18,7 @@ fn := func(index int) error{
     return nil
 }
 
-err := Parallel(len(arr), 3, fn)
+err := Parallel(fn, len(arr), 3)
 ```
 
 ### EnhancedParallel
@@ -58,12 +58,12 @@ err := Race(func() error {
 Runs task parallel, when the count of success task is gt count param, it will return nil. Otherwise it will return error.
 
 ```go
-err := Some(5, 3, func(index int) error {
+err := Some(func(index int) error {
     if index%2 == 0 {
         return nil
     }
     return errors.New("error")
-})
+}, 5, 3)
 ```
 
 ### Any
@@ -71,10 +71,10 @@ err := Some(5, 3, func(index int) error {
 Runs task parallel, when one of task is success, it will return nil. Otherwise it will return error.
 
 ```go
-err := Any(5, func(index int) error {
+err := Any(func(index int) error {
     if index == 4 {
         return nil
     }
     return errors.New("error")
-})
+}, 5)
 ```
