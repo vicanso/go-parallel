@@ -35,7 +35,7 @@ err := EnhancedParallel(Option{
     Max: len(arr), 
     limit: 3,
     Task: fn,
-	BreakOnError: true,
+    BreakOnError: true,
 })
 ```
 
