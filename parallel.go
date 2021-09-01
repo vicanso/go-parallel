@@ -29,10 +29,13 @@ type Option struct {
 	Limit int
 	// task function
 	Task Task
+	// lock task function
+	LockTask LockTask
 	// break the function on error
 	BreakOnError bool
 }
 type Task func(index int) error
+type LockTask func(index int, rw *sync.RWMutex) error
 type RaceTask func() error
 
 // Errors
@@ -69,8 +72,8 @@ func EnhancedParallel(opt Option) error {
 	if opt.Limit <= 0 || opt.Max <= 0 {
 		return errors.New("max and limit should be gt 0")
 	}
-	if opt.Task == nil {
-		return errors.New("task function can not be nil")
+	if opt.Task == nil && opt.LockTask == nil {
+		return errors.New("task(lock task) function can not be nil")
 	}
 	errs := &Errors{}
 	errCount := int32(0)
@@ -78,6 +81,8 @@ func EnhancedParallel(opt Option) error {
 	// 设置带长度的channel，用于限制并发调用
 	ch := make(chan struct{}, opt.Limit)
 	var wg sync.WaitGroup
+
+	rwMutex := &sync.RWMutex{}
 
 	shouldBeBreak := func() bool {
 		return opt.BreakOnError && atomic.LoadInt32(&errCount) != 0
@@ -103,8 +108,13 @@ func EnhancedParallel(opt Option) error {
 			if shouldBeBreak() {
 				return
 			}
+			var err error
+			if opt.LockTask != nil {
+				err = opt.LockTask(index, rwMutex)
+			} else {
+				err = opt.Task(index)
+			}
 
-			err := opt.Task(index)
 			if err != nil {
 				if opt.BreakOnError {
 					atomic.AddInt32(&errCount, 1)
@@ -123,17 +133,27 @@ func EnhancedParallel(opt Option) error {
 	return nil
 }
 
-// Parallel runs task function parallel
-func Parallel(fn Task, max int, limit ...int) error {
+func enhancedParallel(fn Task, lockFn LockTask, max int, limit ...int) error {
 	l := 2
-	if len(limit) != 0 {
+	if len(limit) != 0 && limit[0] > 0 {
 		l = limit[0]
 	}
 	return EnhancedParallel(Option{
-		Max:   max,
-		Limit: l,
-		Task:  fn,
+		Max:      max,
+		Limit:    l,
+		Task:     fn,
+		LockTask: lockFn,
 	})
+}
+
+// Parallel runs task function parallel
+func Parallel(fn Task, max int, limit ...int) error {
+	return enhancedParallel(fn, nil, max, limit...)
+}
+
+// ParallelLock runs lock task function parallel
+func ParallelLock(fn LockTask, max int, limit ...int) error {
+	return enhancedParallel(nil, fn, max, limit...)
 }
 
 // Race runs task function race, it's done when one task has been done

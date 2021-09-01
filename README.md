@@ -21,6 +21,25 @@ fn := func(index int) error{
 err := Parallel(fn, len(arr), 3)
 ```
 
+### ParallelLock
+
+Runs task with limit concurrency
+
+```go
+arr := strings.Split("0123456789", "")
+count := 0
+fn := func(index int, rw *sync.RWMutex) error {
+    fmt.Println(index)
+    fmt.Println(arr[index])
+    rw.Lock()
+    defer rw.Unlock()
+    count++
+    return nil
+}
+
+err := ParallelLock(fn, len(arr), 3)
+```
+
 ### EnhancedParallel
 
 ```go

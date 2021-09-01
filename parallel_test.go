@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +25,26 @@ func TestParallel(t *testing.T) {
 	}
 
 	err := Parallel(fn, len(arr))
+	assert.Nil(err)
+	assert.Equal(len(arr), int(count))
+	assert.Equal(45, int(sum))
+}
+
+func TestParallelLock(t *testing.T) {
+	assert := assert.New(t)
+
+	arr := strings.Split("0123456789", "")
+	count := 0
+	sum := 0
+	fn := func(index int, rw *sync.RWMutex) error {
+		rw.Lock()
+		defer rw.Unlock()
+		count++
+		sum += index
+		return nil
+	}
+
+	err := ParallelLock(fn, len(arr))
 	assert.Nil(err)
 	assert.Equal(len(arr), int(count))
 	assert.Equal(45, int(sum))
