@@ -62,7 +62,11 @@ func TestParallelError(t *testing.T) {
 		return errors.New(strconv.Itoa(index))
 	}
 
-	err := Parallel(fn, len(arr), 3)
+	err := EnhancedParallel(Option{
+		Task:  fn,
+		Max:   len(arr),
+		Limit: 3,
+	})
 	assert.NotNil(err)
 	errs, ok := err.(*Errors)
 	assert.True(ok)

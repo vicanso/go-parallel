@@ -139,10 +139,11 @@ func enhancedParallel(fn Task, lockFn LockTask, max int, limit ...int) error {
 		l = limit[0]
 	}
 	return EnhancedParallel(Option{
-		Max:      max,
-		Limit:    l,
-		Task:     fn,
-		LockTask: lockFn,
+		Max:          max,
+		Limit:        l,
+		Task:         fn,
+		LockTask:     lockFn,
+		BreakOnError: true,
 	})
 }
 
