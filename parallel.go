@@ -84,14 +84,14 @@ func EnhancedParallel(opt Option) error {
 
 	rwMutex := &sync.RWMutex{}
 
-	shouldBeBreak := func() bool {
+	shouldBreak := func() bool {
 		return opt.BreakOnError && atomic.LoadInt32(&errCount) != 0
 	}
 
 	for i := 0; i < opt.Max; i++ {
 		// 如果设置出错时退出，而且出错数量不为0
 		// 直接退出当前循环
-		if shouldBeBreak() {
+		if shouldBreak() {
 			break
 		}
 		wg.Add(1)
@@ -105,7 +105,7 @@ func EnhancedParallel(opt Option) error {
 			// 如果设置了出错时退出，而且当前出错数量不为1
 			// 此处仅简单的使用atomic处理，并不保证当一个任务出错后，
 			// 后续的任务肯定不执行。
-			if shouldBeBreak() {
+			if shouldBreak() {
 				return
 			}
 			var err error
@@ -125,7 +125,7 @@ func EnhancedParallel(opt Option) error {
 	}
 	// 等待所有任务完成
 	wg.Wait()
-	// 关闭channel
+	// 关闭channel（不关闭则在回收时自动清除）
 	close(ch)
 	if errs.Exists() {
 		return errs
