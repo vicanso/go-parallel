@@ -205,7 +205,7 @@ func Some(fn Task, max, count int) error {
 	wg := sync.WaitGroup{}
 	successCount := int32(0)
 	done := make(chan int)
-	errs := Errors{}
+	errs := &Errors{}
 	for i := 0; i < max; i++ {
 		wg.Add(1)
 		go func(index int) {
@@ -233,7 +233,7 @@ func Some(fn Task, max, count int) error {
 	}
 
 	// 全部结束，但未达到成功要求
-	return &errs
+	return errs
 }
 
 // Any runs task function, if one task is success, it will return nil,
