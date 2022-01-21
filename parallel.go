@@ -16,7 +16,6 @@ package parallel
 
 import (
 	"errors"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -167,29 +166,24 @@ func Race(tasks ...RaceTask) error {
 		return tasks[0]()
 	}
 
-	selectCaseList := make([]reflect.SelectCase, size)
+	doneCount := int32(0)
+	p := &doneCount
+	var err error
+	done := make(chan struct{}, 1)
+	defer close(done)
 	// 根据task生成对应的chan error
-	for index, task := range tasks {
-		ch := make(chan error)
-		selectCaseList[index].Dir = reflect.SelectRecv
-		selectCaseList[index].Chan = reflect.ValueOf(ch)
-		go func(c chan error, t RaceTask) {
-			c <- t()
-		}(ch, task)
+	for _, task := range tasks {
+		go func(t RaceTask) {
+			e := t()
+			value := atomic.AddInt32(p, 1)
+			// 只有第一个完成的才会触发
+			if value == 1 {
+				err = e
+				done <- struct{}{}
+			}
+		}(task)
 	}
-
-	_, recv, recvOk := reflect.Select(selectCaseList)
-	if !recvOk {
-		return errors.New("receive from chan fail")
-	}
-	value := recv.Interface()
-	if value == nil {
-		return nil
-	}
-	err, ok := value.(error)
-	if !ok {
-		return errors.New("receive value should be error")
-	}
+	<-done
 	return err
 }
 
@@ -204,7 +198,7 @@ func Some(fn Task, max, count int) error {
 	}
 	wg := sync.WaitGroup{}
 	successCount := int32(0)
-	done := make(chan int)
+	done := make(chan int, 1)
 	errs := &Errors{}
 	for i := 0; i < max; i++ {
 		wg.Add(1)
@@ -222,6 +216,7 @@ func Some(fn Task, max, count int) error {
 			wg.Done()
 		}(i)
 	}
+	// 所有任务都完成，但未达到完成条件
 	go func() {
 		wg.Wait()
 		done <- 1
