@@ -167,7 +167,6 @@ func Race(tasks ...RaceTask) error {
 	}
 
 	doneCount := int32(0)
-	p := &doneCount
 	var err error
 	done := make(chan struct{}, 1)
 	defer close(done)
@@ -175,7 +174,7 @@ func Race(tasks ...RaceTask) error {
 	for _, task := range tasks {
 		go func(t RaceTask) {
 			e := t()
-			value := atomic.AddInt32(p, 1)
+			value := atomic.AddInt32(&doneCount, 1)
 			// 只有第一个完成的才会触发
 			if value == 1 {
 				err = e
@@ -196,31 +195,30 @@ func Some(fn Task, max, count int) error {
 	if count >= max {
 		return errors.New("max should be gt count")
 	}
-	wg := sync.WaitGroup{}
 	successCount := int32(0)
+	doneCount := int32(0)
 	done := make(chan int, 1)
+	defer close(done)
 	errs := &Errors{}
 	for i := 0; i < max; i++ {
-		wg.Add(1)
 		go func(index int) {
 			err := fn(index)
 			if err == nil {
 				v := atomic.AddInt32(&successCount, 1)
-				// 已达到完成条件
+				// 已达到完成条件，设置完成，并直接返回
+				// 不再触发doneCount，避免successCount与doneCount同时满足
 				if int(v) == count {
 					done <- 0
+					return
 				}
-			} else {
-				errs.Add(err)
 			}
-			wg.Done()
+			errs.Add(err)
+			// 已执行完最后一条，但未满足successCount
+			if int(atomic.AddInt32(&doneCount, 1)) == max {
+				done <- 1
+			}
 		}(i)
 	}
-	// 所有任务都完成，但未达到完成条件
-	go func() {
-		wg.Wait()
-		done <- 1
-	}()
 
 	// 成功的的任务数达到max
 	if <-done == 0 {
