@@ -156,8 +156,7 @@ func ParallelLock(fn LockTask, max int, limit ...int) error {
 	return enhancedParallel(nil, fn, max, limit...)
 }
 
-// Race runs task function race, it's done when one task has been done
-func Race(tasks ...RaceTask) error {
+func race(onlySucceed bool, tasks ...RaceTask) error {
 	size := len(tasks)
 	if size == 0 {
 		return nil
@@ -167,16 +166,34 @@ func Race(tasks ...RaceTask) error {
 	}
 
 	doneCount := int32(0)
+	successCount := int32(0)
 	var err error
 	done := make(chan struct{}, 1)
 	defer close(done)
+	taskCount := len(tasks)
 	// 根据task生成对应的chan error
 	for _, task := range tasks {
 		go func(t RaceTask) {
 			e := t()
 			value := atomic.AddInt32(&doneCount, 1)
-			// 只有第一个完成的才会触发
-			if value == 1 {
+			// 如果非判断成功的任务
+			if !onlySucceed {
+				// 只有第一个完成的才会触发
+				if value == 1 {
+					err = e
+					done <- struct{}{}
+				}
+				return
+			}
+
+			// 成功的第一个任务
+			if e == nil && atomic.AddInt32(&successCount, 1) == 1 {
+				done <- struct{}{}
+				return
+			}
+
+			// 所有任务均完成，但无一成功
+			if value == int32(taskCount) {
 				err = e
 				done <- struct{}{}
 			}
@@ -184,6 +201,16 @@ func Race(tasks ...RaceTask) error {
 	}
 	<-done
 	return err
+}
+
+// Race runs task function race, it's done when one task has been done
+func Race(tasks ...RaceTask) error {
+	return race(false, tasks...)
+}
+
+// RaceSucceed runs task function race, it's done when one task has been successful or all task done.
+func RaceSucceed(tasks ...RaceTask) error {
+	return race(true, tasks...)
 }
 
 // Some returns task function, when success time is >= count,

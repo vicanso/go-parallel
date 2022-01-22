@@ -135,6 +135,34 @@ func TestRace(t *testing.T) {
 	assert.Nil(err)
 }
 
+func TestRaceSucceed(t *testing.T) {
+	assert := assert.New(t)
+
+	customErr := errors.New("custom error")
+
+	magicNumber := int32(0)
+	err := RaceSucceed(func() error {
+		return customErr
+	}, func() error {
+		time.Sleep(10 * time.Millisecond)
+		atomic.StoreInt32(&magicNumber, 2)
+		return nil
+	})
+	assert.Nil(err)
+	assert.Equal(int32(2), magicNumber)
+
+	err = RaceSucceed(func() error {
+		return errors.New("abc")
+	}, func() error {
+		time.Sleep(10 * time.Millisecond)
+		return errors.New("def")
+	}, func() error {
+		time.Sleep(50 * time.Millisecond)
+		return customErr
+	})
+	assert.Equal(customErr, err)
+}
+
 func TestSome(t *testing.T) {
 	assert := assert.New(t)
 
