@@ -193,7 +193,7 @@ func race(onlySucceed bool, tasks ...RaceTask) error {
 			}
 
 			// 所有任务均完成，但无一成功
-			if value == int32(taskCount) {
+			if value == int32(taskCount) && atomic.LoadInt32(&successCount) == 0 {
 				err = e
 				done <- struct{}{}
 			}
