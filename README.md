@@ -1,3 +1,5 @@
+Please use [conc](https://github.com/sourcegraph/conc) instead of `go-parallel`.
+
 # go-parallel
 
 [![Build Status](https://github.com/vicanso/go-parallel/workflows/Test/badge.svg)](https://github.com/vicanso/go-parallel/actions)
